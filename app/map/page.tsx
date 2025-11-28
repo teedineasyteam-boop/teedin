@@ -74,6 +74,49 @@ function PropertySearchContent() {
     return undefined;
   };
 
+  // Property type matching function (same as all-properties page)
+  type PropertyTypeCode =
+    | "condo"
+    | "house"
+    | "land"
+    | "office"
+    | "townhouse"
+    | "commercial";
+
+  const propertyMatchesType = (
+    property: any,
+    code: PropertyTypeCode
+  ): boolean => {
+    const raw = (property?.property_category ?? "").toString().toLowerCase();
+    if (!raw) return true; // หากไม่มีหมวดหมู่ ให้ผ่านไป (กันข้อมูล legacy)
+
+    const hasAny = (candidates: string[]): boolean =>
+      candidates.some(k => raw.includes(k));
+
+    switch (code) {
+      case "condo":
+        return hasAny(["คอนโด", "condo"]);
+      case "house":
+        return hasAny(["บ้าน", "house"]);
+      case "land":
+        return hasAny(["ที่ดิน", "land"]);
+      case "office":
+        return hasAny(["สำนักงาน", "office"]);
+      case "townhouse":
+        return hasAny(["ทาวน์โฮม", "ทาวน์เฮาส์", "townhome", "townhouse"]);
+      case "commercial":
+        return hasAny([
+          "อาคารพาณิชย์",
+          "ช้อปเฮาส์",
+          "ช็อปเฮาส์",
+          "shophouse",
+          "commercial",
+        ]);
+      default:
+        return true;
+    }
+  };
+
   // Effect to close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -323,31 +366,48 @@ function PropertySearchContent() {
 
       // Property type filter
       if (propertyType !== "all") {
-        const typeLower = propertyType.toLowerCase();
-        const typeMatch =
-          property.title?.toLowerCase().includes(typeLower) ||
-          property.description?.toLowerCase().includes(typeLower) ||
-          property.localized?.title?.th?.toLowerCase().includes(typeLower) ||
-          property.localized?.title?.en?.toLowerCase().includes(typeLower) ||
-          property.localized?.description?.th
-            ?.toLowerCase()
-            .includes(typeLower) ||
-          property.localized?.description?.en
-            ?.toLowerCase()
-            .includes(typeLower);
-        if (!typeMatch) return false;
+        if (!propertyMatchesType(property, propertyType as PropertyTypeCode)) {
+          return false;
+        }
       }
 
-      // Listing type filter (rent/sale)
+      // Listing type filter (rent/sale/sold/rented)
       if (listingType !== "all") {
-        if (listingType === "rent" && !property.isForRent) return false;
-        if (listingType === "sale" && !property.isForSale) return false;
+        const isSold =
+          property.status === "sold" ||
+          (property as any).is_sold === true ||
+          (property as any).isSold === true ||
+          (property as any).sold === true ||
+          (typeof property.status === "string" && /sold/i.test(property.status));
+
+        const isRented =
+          property.status === "rented" ||
+          (property as any).is_rented === true ||
+          (property as any).isRented === true ||
+          (property as any).rented === true ||
+          (typeof property.status === "string" &&
+            /rented/i.test(property.status));
+
+        if (listingType === "rent") {
+          if (property.isForRent !== true || isRented || isSold) return false;
+        } else if (listingType === "sale") {
+          if (property.isForSale !== true || isSold || isRented) return false;
+        } else if (listingType === "sold") {
+          if (!isSold) return false;
+        } else if (listingType === "rented") {
+          if (!isRented) return false;
+        }
       }
 
       // Bedrooms filter
       if (bedrooms !== "all") {
-        const bedroomNum = parseInt(bedrooms);
-        if (property.details.bedrooms !== bedroomNum) return false;
+        if (bedrooms === "4") {
+          // "4+ ห้องนอน" means 4 or more
+          if ((property.details?.bedrooms ?? 0) < 4) return false;
+        } else {
+          const bedroomNum = parseInt(bedrooms);
+          if ((property.details?.bedrooms ?? 0) !== bedroomNum) return false;
+        }
       }
 
       // Price filter (using priceRange array)
@@ -453,6 +513,8 @@ function PropertySearchContent() {
               <option value="all">{t("listing_type_all")}</option>
               <option value="rent">{t("listing_type_rent")}</option>
               <option value="sale">{t("listing_type_sale")}</option>
+              <option value="sold">ขายแล้ว</option>
+              <option value="rented">เช่าแล้ว</option>
             </select>
 
             {/* Bedrooms Dropdown (ประเภทห้อง / จำนวนห้องนอน) */}
@@ -668,6 +730,8 @@ function PropertySearchContent() {
                   <option value="all">{t("listing_type_all")}</option>
                   <option value="rent">{t("listing_type_rent")}</option>
                   <option value="sale">{t("listing_type_sale")}</option>
+                  <option value="sold">ขายแล้ว</option>
+                  <option value="rented">เช่าแล้ว</option>
                 </select>
               </div>
 
