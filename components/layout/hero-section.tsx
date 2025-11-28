@@ -354,21 +354,21 @@ export function HeroSection({
               </button>
               <button
                 type="button"
-                onClick={() => router.push(`/all-properties`)}
+                onClick={() => router.push(`/coming-soon`)}
                 className="text-white hover:text-blue-200 text-sm"
               >
                 {t("real_estate")}
               </button>
               <button
                 type="button"
-                onClick={() => router.push(`/all-properties?isNew=true`)}
+                onClick={() => router.push(`/coming-soon`)}
                 className="text-white hover:text-blue-200 text-sm"
               >
                 {t("new_real_estate")}
               </button>
               <button
                 type="button"
-                onClick={() => router.push(`/all-properties?isProject=true`)}
+                onClick={() => router.push(`/coming-soon`)}
                 className="text-white hover:text-blue-200 text-sm"
               >
                 {t("new_projects")}
@@ -481,19 +481,19 @@ export function HeroSection({
                 {t("rent")}
               </button>
               <Link
-                href="/real-estate"
+                href="/coming-soon"
                 className="text-white hover:text-blue-200 text-sm"
               >
                 {t("real_estate")}
               </Link>
               <Link
-                href="/new-real-estate"
+                href="/coming-soon"
                 className="text-white hover:text-blue-200 text-sm"
               >
                 {t("new_real_estate")}
               </Link>
               <Link
-                href="/new-projects"
+                href="/coming-soon"
                 className="text-white hover:text-blue-200 text-sm"
               >
                 {t("new_projects")}
