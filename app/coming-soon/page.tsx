@@ -1,5 +1,10 @@
 "use client";
 
+import { RoleSwitchAlert } from "@/app/add-property/components/RoleSwitchAlert";
+import LoginSuccessModal from "@/app/components/LoginSuccessModal";
+import { AgentRegisterModal } from "@/components/auth/agent-register-modal";
+import { LoginDrawer } from "@/components/auth/login-drawer";
+import { RegisterDrawer } from "@/components/auth/register-drawer";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,11 +18,40 @@ import { Bell, ChevronDown, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function ComingSoonPage() {
   const router = useRouter();
   const { isLoggedIn, userRole, baseRole, loading } = useAuth();
   const { language, setLanguage, t } = useLanguage();
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [showRoleSwitchAlert, setShowRoleSwitchAlert] = useState(false);
+  const [isLoginSuccessOpen, setIsLoginSuccessOpen] = useState(false);
+  const [showAgentRegister, setShowAgentRegister] = useState(false);
+
+  // Handle listing click - require login or navigate to add-property
+  const handleListingClick = () => {
+    if (!isLoggedIn) {
+      // ถ้ายังไม่ได้ล็อกอิน ให้เปิด login drawer
+      setIsLoginOpen(true);
+      return;
+    }
+
+    if (userRole === "customer") {
+      setShowRoleSwitchAlert(true);
+      return;
+    }
+
+    // ถ้าล็อกอินแล้ว ให้ไปหน้า add-property
+    router.push("/add-property");
+  };
+
+  // Handle login success for listing
+  const handleLoginSuccessForListing = () => {
+    setIsLoginOpen(false);
+    setIsLoginSuccessOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -77,6 +111,14 @@ export default function ComingSoonPage() {
                 >
                   {t("new_projects")}
                 </Link>
+                <button
+                  type="button"
+                  onClick={handleListingClick}
+                  className="text-white hover:text-blue-200 text-sm"
+                  suppressHydrationWarning={true}
+                >
+                  {t("post_listing")}
+                </button>
               </nav>
             </div>
 
@@ -143,7 +185,7 @@ export default function ComingSoonPage() {
               ) : (
                 <Button
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
-                  onClick={() => router.push("/auth/login")}
+                  onClick={() => setIsLoginOpen(true)}
                   suppressHydrationWarning
                 >
                   {t("login")}
@@ -172,6 +214,43 @@ export default function ComingSoonPage() {
           </Link>
         </div>
       </main>
+
+      {/* Login Drawer */}
+      <LoginDrawer
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onLoginSuccess={handleLoginSuccessForListing}
+        showSuccessModal={true}
+        onSwitchToRegister={() => {
+          setIsLoginOpen(false);
+          setIsRegisterOpen(true);
+        }}
+      />
+      <RegisterDrawer
+        isOpen={isRegisterOpen}
+        onClose={() => setIsRegisterOpen(false)}
+        onSwitchToLogin={() => {
+          setIsRegisterOpen(false);
+          setIsLoginOpen(true);
+        }}
+      />
+      {/* Role Switch Alert */}
+      <RoleSwitchAlert
+        isOpen={showRoleSwitchAlert}
+        onOpenChange={setShowRoleSwitchAlert}
+        showAgentRegister={showAgentRegister}
+        setShowAgentRegister={setShowAgentRegister}
+      />
+      {/* Agent Register Modal */}
+      <AgentRegisterModal
+        isOpen={showAgentRegister}
+        onClose={() => setShowAgentRegister(false)}
+      />
+      {/* Login Success Modal */}
+      <LoginSuccessModal
+        isOpen={isLoginSuccessOpen}
+        onClose={() => setIsLoginSuccessOpen(false)}
+      />
     </div>
   );
 }

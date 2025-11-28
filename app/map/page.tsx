@@ -2,6 +2,8 @@
 
 import type { PropertyData } from "@/components/property/property-card";
 import { PropertyCard } from "@/components/property/property-card";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { useLanguage } from "@/contexts/language-context";
 import { useProperty } from "@/contexts/property-context";
 import { ArrowLeft, ChevronDown, ChevronRight, Search, X } from "lucide-react";
@@ -55,15 +57,10 @@ function PropertySearchContent() {
   } | null>(null);
   // const mapRef = useRef<HTMLDivElement>(null);
 
-  // New states for price range slider
-  const [currentMinPrice, setCurrentMinPrice] = useState<number>(10000);
-  const [currentMaxPrice, setCurrentMaxPrice] = useState<number>(1000000000);
-  const [appliedMinPrice, setAppliedMinPrice] = useState<number>(10000);
-  const [appliedMaxPrice, setAppliedMaxPrice] = useState<number>(1000000000);
-
-  // State for Price Popover visibility
-  const [showPricePopover, setShowPricePopover] = useState<boolean>(false);
-  const pricePopoverRef = useRef<HTMLDivElement>(null); // Ref for detecting clicks outside
+  // New states for price range slider - using array format like all-properties page
+  const [priceRange, setPriceRange] = useState([0, 100000000]); // 0 to 100 million
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // New state for Filters Popover and sorting
   const [showFilterPopover, setShowFilterPopover] = useState<boolean>(false);
@@ -71,80 +68,71 @@ function PropertySearchContent() {
   const [sortBy, setSortBy] = useState<string>("default"); // default, new-old, price-asc, price-desc
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  // Helper to format price with commas
-  const formatPriceForDisplay = (price: number): string => {
-    return price.toLocaleString();
+  // Fix for TypeScript ref callback error
+  const setDropdownRef = (key: string) => (el: HTMLDivElement | null) => {
+    dropdownRefs.current[key] = el;
+    return undefined;
   };
 
-  const handlePriceSliderChange = (value: number, type: "min" | "max") => {
-    if (type === "min") {
-      setCurrentMinPrice(Math.min(value, currentMaxPrice));
-    } else {
-      setCurrentMaxPrice(Math.max(value, currentMinPrice));
+  // Property type matching function (same as all-properties page)
+  type PropertyTypeCode =
+    | "condo"
+    | "house"
+    | "land"
+    | "office"
+    | "townhouse"
+    | "commercial";
+
+  const propertyMatchesType = (
+    property: any,
+    code: PropertyTypeCode
+  ): boolean => {
+    const raw = (property?.property_category ?? "").toString().toLowerCase();
+    if (!raw) return true; // หากไม่มีหมวดหมู่ ให้ผ่านไป (กันข้อมูล legacy)
+
+    const hasAny = (candidates: string[]): boolean =>
+      candidates.some(k => raw.includes(k));
+
+    switch (code) {
+      case "condo":
+        return hasAny(["คอนโด", "condo"]);
+      case "house":
+        return hasAny(["บ้าน", "house"]);
+      case "land":
+        return hasAny(["ที่ดิน", "land"]);
+      case "office":
+        return hasAny(["สำนักงาน", "office"]);
+      case "townhouse":
+        return hasAny(["ทาวน์โฮม", "ทาวน์เฮาส์", "townhome", "townhouse"]);
+      case "commercial":
+        return hasAny([
+          "อาคารพาณิชย์",
+          "ช้อปเฮาส์",
+          "ช็อปเฮาส์",
+          "shophouse",
+          "commercial",
+        ]);
+      default:
+        return true;
     }
   };
 
-  const handleApplyPriceFilter = () => {
-    setAppliedMinPrice(currentMinPrice);
-    setAppliedMaxPrice(currentMaxPrice);
-    setShowPricePopover(false); // Close popover after applying
-  };
-
-  // Effect to close popover when clicking outside
+  // Effect to close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        pricePopoverRef.current &&
-        !pricePopoverRef.current.contains(event.target as Node)
+        openDropdown &&
+        !dropdownRefs.current[openDropdown]?.contains(event.target as Node)
       ) {
-        // Check if the click target is not the price filter trigger itself
-        const priceFilterTrigger = document.getElementById(
-          "price-filter-trigger"
-        );
-        if (
-          priceFilterTrigger &&
-          !priceFilterTrigger.contains(event.target as Node)
-        ) {
-          setShowPricePopover(false);
-        }
+        setOpenDropdown(null);
       }
     };
 
-    if (showPricePopover) {
-      document.addEventListener("mousedown", handleClickOutside);
-    } else {
-      document.removeEventListener("mousedown", handleClickOutside);
-    }
-
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showPricePopover]);
-
-  // Effect to close Filter Popover when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        filterPopoverRef.current &&
-        !filterPopoverRef.current.contains(event.target as Node)
-      ) {
-        const filterTrigger = document.getElementById("filter-trigger");
-        if (filterTrigger && !filterTrigger.contains(event.target as Node)) {
-          setShowFilterPopover(false);
-        }
-      }
-    };
-
-    if (showFilterPopover) {
-      document.addEventListener("mousedown", handleClickOutside);
-    } else {
-      document.removeEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showFilterPopover]);
+  }, [openDropdown]);
 
   // Effect to read URL parameters and set initial filters
   useEffect(() => {
@@ -353,8 +341,8 @@ function PropertySearchContent() {
           typeof property.location === "string"
             ? property.location
             : property.location?.address ||
-              (property.location as any)?.["ที่อยู่"] ||
-              "";
+            (property.location as any)?.["ที่อยู่"] ||
+            "";
         const matchesSearch =
           property.title?.toLowerCase().includes(searchLower) ||
           locationText.toLowerCase().includes(searchLower) ||
@@ -378,36 +366,57 @@ function PropertySearchContent() {
 
       // Property type filter
       if (propertyType !== "all") {
-        const typeLower = propertyType.toLowerCase();
-        const typeMatch =
-          property.title?.toLowerCase().includes(typeLower) ||
-          property.description?.toLowerCase().includes(typeLower) ||
-          property.localized?.title?.th?.toLowerCase().includes(typeLower) ||
-          property.localized?.title?.en?.toLowerCase().includes(typeLower) ||
-          property.localized?.description?.th
-            ?.toLowerCase()
-            .includes(typeLower) ||
-          property.localized?.description?.en
-            ?.toLowerCase()
-            .includes(typeLower);
-        if (!typeMatch) return false;
+        if (!propertyMatchesType(property, propertyType as PropertyTypeCode)) {
+          return false;
+        }
       }
 
-      // Listing type filter (rent/sale)
+      // Listing type filter (rent/sale/sold/rented)
       if (listingType !== "all") {
-        if (listingType === "rent" && !property.isForRent) return false;
-        if (listingType === "sale" && !property.isForSale) return false;
+        const isSold =
+          property.status === "sold" ||
+          (property as any).is_sold === true ||
+          (property as any).isSold === true ||
+          (property as any).sold === true ||
+          (typeof property.status === "string" && /sold/i.test(property.status));
+
+        const isRented =
+          property.status === "rented" ||
+          (property as any).is_rented === true ||
+          (property as any).isRented === true ||
+          (property as any).rented === true ||
+          (typeof property.status === "string" &&
+            /rented/i.test(property.status));
+
+        if (listingType === "rent") {
+          if (property.isForRent !== true || isRented || isSold) return false;
+        } else if (listingType === "sale") {
+          if (property.isForSale !== true || isSold || isRented) return false;
+        } else if (listingType === "sold") {
+          if (!isSold) return false;
+        } else if (listingType === "rented") {
+          if (!isRented) return false;
+        }
       }
 
       // Bedrooms filter
       if (bedrooms !== "all") {
-        const bedroomNum = parseInt(bedrooms);
-        if (property.details.bedrooms !== bedroomNum) return false;
+        if (bedrooms === "4") {
+          // "4+ ห้องนอน" means 4 or more
+          if ((property.details?.bedrooms ?? 0) < 4) return false;
+        } else {
+          const bedroomNum = parseInt(bedrooms);
+          if ((property.details?.bedrooms ?? 0) !== bedroomNum) return false;
+        }
       }
 
-      // Price filter (using applied values)
+      // Price filter (using priceRange array)
       const price = parseInt(property.price.replace(/[^0-9]/g, "") || "0");
-      if (price < appliedMinPrice || price > appliedMaxPrice) {
+      if (
+        !isNaN(price) &&
+        price > 0 &&
+        (price < priceRange[0] || price > priceRange[1])
+      ) {
         return false;
       }
 
@@ -439,8 +448,7 @@ function PropertySearchContent() {
     propertyType,
     listingType,
     bedrooms,
-    appliedMinPrice,
-    appliedMaxPrice,
+    priceRange,
     sortBy,
     mapBounds,
   ]);
@@ -505,6 +513,8 @@ function PropertySearchContent() {
               <option value="all">{t("listing_type_all")}</option>
               <option value="rent">{t("listing_type_rent")}</option>
               <option value="sale">{t("listing_type_sale")}</option>
+              <option value="sold">ขายแล้ว</option>
+              <option value="rented">เช่าแล้ว</option>
             </select>
 
             {/* Bedrooms Dropdown (ประเภทห้อง / จำนวนห้องนอน) */}
@@ -523,58 +533,95 @@ function PropertySearchContent() {
               <option value="4">4+ ห้องนอน</option>
             </select>
 
-            {/* Price Range Filter Trigger (replacing dropdown) */}
-            <div
-              id="price-filter-trigger"
-              className="w-40 bg-white border border-gray-300 rounded px-3 py-1 text-sm text-gray-700 flex items-center justify-between cursor-pointer shadow-sm relative" /* Added relative */
-              onClick={() => setShowPricePopover(!showPricePopover)}
-            >
-              <span>{t("price_label")}</span>
-              <ChevronDown className="w-4 h-4" />
-
-              {/* Price Slider Popover (conditionally rendered) */}
-              {showPricePopover && (
-                <div
-                  ref={pricePopoverRef}
-                  className="absolute bg-white border border-gray-300 rounded-lg p-3 text-sm text-gray-700 w-64 flex flex-col items-start shadow-lg z-50 top-full -left-12 mt-2"
-                >
-                  <span className="text-xs font-semibold text-gray-600 mb-2">
-                    {t("price_label")}
-                  </span>
-                  <div className="flex justify-between w-full text-xs font-medium text-gray-800 mb-2">
-                    <span>{formatPriceForDisplay(currentMinPrice)}</span>
-                    <span>{formatPriceForDisplay(currentMaxPrice)}</span>
+            {/* Price Range Filter */}
+            <div className="relative" ref={setDropdownRef("price")}>
+              <div
+                className="w-40 bg-white border border-gray-300 rounded px-3 py-1 text-sm text-gray-700 flex items-center justify-between cursor-pointer shadow-sm"
+                onClick={() =>
+                  setOpenDropdown(openDropdown === "price" ? null : "price")
+                }
+              >
+                <span>{t("price_label")}</span>
+                <ChevronDown className="w-4 h-4" />
+              </div>
+              {openDropdown === "price" && (
+                <div className="absolute top-full mt-2 z-20 bg-white shadow-lg rounded-md border border-gray-200 w-64 sm:w-80 p-4">
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-600">
+                      {t("price_range_label")}
+                    </h4>
+                    <Slider
+                      value={[priceRange[0]]}
+                      max={100000000}
+                      step={1000000}
+                      onValueChange={value => {
+                        const newMinRaw = Array.isArray(value)
+                          ? value[0]
+                          : Number(value);
+                        const newMin = Math.min(
+                          Math.max(0, newMinRaw),
+                          100000000
+                        );
+                        setPriceRange([newMin, 100000000]);
+                      }}
+                      className="mb-6 [&_[role=slider]]:bg-blue-600 [&_[role=slider]]:border-blue-600"
+                    />
+                    <div className="flex flex-col sm:flex-row sm:justify-between mt-2 gap-4 sm:gap-0">
+                      <div className="flex flex-col">
+                        <span className="text-xs text-gray-500">
+                          {t("min_price_label")}
+                        </span>
+                        <input
+                          type="text"
+                          value={priceRange[0].toLocaleString()}
+                          className="bg-white border border-gray-300 rounded px-2 py-1 text-sm w-32 mt-1 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          title={t("min_price_label")}
+                          placeholder={t("min_price_label")}
+                          onChange={e => {
+                            const value = parseInt(
+                              e.target.value.replace(/,/g, "")
+                            );
+                            if (!isNaN(value)) {
+                              const newMin = Math.min(
+                                Math.max(0, value),
+                                100000000
+                              );
+                              setPriceRange([newMin, 100000000]);
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs text-gray-500">
+                          {t("max_price_label")}
+                        </span>
+                        <input
+                          type="text"
+                          value={(100000000).toLocaleString()}
+                          className="bg-white border border-gray-300 rounded px-2 py-1 text-sm w-32 mt-1 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          title={t("max_price_label")}
+                          placeholder={t("max_price_label")}
+                          readOnly
+                          disabled
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-between mt-5">
+                      <Button
+                        variant="outline"
+                        className="text-sm px-4 py-2 bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                        onClick={() => setPriceRange([0, 100000000])}
+                      >
+                        {t("reset_button")}
+                      </Button>
+                      <Button
+                        className="text-sm px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => setOpenDropdown(null)}
+                      >
+                        {t("apply_button")}
+                      </Button>
+                    </div>
                   </div>
-                  <input
-                    type="range"
-                    min="10000"
-                    max="1000000000"
-                    value={currentMinPrice}
-                    onChange={e =>
-                      handlePriceSliderChange(parseInt(e.target.value), "min")
-                    }
-                    className="w-full h-1 bg-blue-600 rounded-lg appearance-none cursor-pointer mb-2"
-                    title="เลือกราคาต่ำสุด"
-                    aria-label="เลือกราคาต่ำสุด"
-                  />
-                  <input
-                    type="range"
-                    min="10000"
-                    max="1000000000"
-                    value={currentMaxPrice}
-                    onChange={e =>
-                      handlePriceSliderChange(parseInt(e.target.value), "max")
-                    }
-                    className="w-full h-1 bg-blue-600 rounded-lg appearance-none cursor-pointer"
-                    title="เลือกราคาสูงสุด"
-                    aria-label="เลือกราคาสูงสุด"
-                  />
-                  <button
-                    className="mt-3 w-full bg-blue-600 text-white rounded-md py-1 text-xs font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                    onClick={handleApplyPriceFilter}
-                  >
-                    ยืนยัน
-                  </button>
                 </div>
               )}
             </div>
@@ -683,6 +730,8 @@ function PropertySearchContent() {
                   <option value="all">{t("listing_type_all")}</option>
                   <option value="rent">{t("listing_type_rent")}</option>
                   <option value="sale">{t("listing_type_sale")}</option>
+                  <option value="sold">ขายแล้ว</option>
+                  <option value="rented">เช่าแล้ว</option>
                 </select>
               </div>
 
@@ -710,40 +759,66 @@ function PropertySearchContent() {
                   ราคา
                 </label>
                 <div className="mt-1 bg-white border border-gray-300 rounded p-3 text-sm text-gray-700">
+                  <Slider
+                    value={[priceRange[0]]}
+                    max={100000000}
+                    step={1000000}
+                    onValueChange={value => {
+                      const newMinRaw = Array.isArray(value)
+                        ? value[0]
+                        : Number(value);
+                      const newMin = Math.min(
+                        Math.max(0, newMinRaw),
+                        100000000
+                      );
+                      setPriceRange([newMin, 100000000]);
+                    }}
+                    className="mb-6 [&_[role=slider]]:bg-blue-600 [&_[role=slider]]:border-blue-600"
+                  />
                   <div className="flex justify-between w-full text-xs font-medium text-gray-800 mb-2">
-                    <span>{formatPriceForDisplay(currentMinPrice)}</span>
-                    <span>{formatPriceForDisplay(currentMaxPrice)}</span>
+                    <span>{priceRange[0].toLocaleString()}</span>
+                    <span>{(100000000).toLocaleString()}</span>
                   </div>
-                  <input
-                    type="range"
-                    min="10000"
-                    max="1000000000"
-                    value={currentMinPrice}
-                    onChange={e =>
-                      handlePriceSliderChange(parseInt(e.target.value), "min")
-                    }
-                    className="w-full h-1 bg-blue-600 rounded-lg appearance-none cursor-pointer mb-2"
-                    title="เลือกราคาต่ำสุด"
-                    aria-label="เลือกราคาต่ำสุด"
-                  />
-                  <input
-                    type="range"
-                    min="10000"
-                    max="1000000000"
-                    value={currentMaxPrice}
-                    onChange={e =>
-                      handlePriceSliderChange(parseInt(e.target.value), "max")
-                    }
-                    className="w-full h-1 bg-blue-600 rounded-lg appearance-none cursor-pointer"
-                    title="เลือกราคาสูงสุด"
-                    aria-label="เลือกราคาสูงสุด"
-                  />
-                  <button
-                    className="mt-3 w-full bg-blue-600 text-white rounded-md py-1 text-xs font-semibold hover:bg-blue-700"
-                    onClick={handleApplyPriceFilter}
-                  >
-                    ยืนยัน
-                  </button>
+                  <div className="flex flex-col gap-2 mt-2">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-500">
+                        {t("min_price_label")}
+                      </span>
+                      <input
+                        type="text"
+                        value={priceRange[0].toLocaleString()}
+                        className="bg-white border border-gray-300 rounded px-2 py-1 text-sm mt-1 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        title={t("min_price_label")}
+                        placeholder={t("min_price_label")}
+                        onChange={e => {
+                          const value = parseInt(
+                            e.target.value.replace(/,/g, "")
+                          );
+                          if (!isNaN(value)) {
+                            const newMin = Math.min(
+                              Math.max(0, value),
+                              100000000
+                            );
+                            setPriceRange([newMin, 100000000]);
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-500">
+                        {t("max_price_label")}
+                      </span>
+                      <input
+                        type="text"
+                        value={(100000000).toLocaleString()}
+                        className="bg-white border border-gray-300 rounded px-2 py-1 text-sm mt-1 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        title={t("max_price_label")}
+                        placeholder={t("max_price_label")}
+                        readOnly
+                        disabled
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -789,11 +864,10 @@ function PropertySearchContent() {
 
         {/* Sidebar Overlay อยู่บน map เสมอ - ลดความกว้างในมือถือ */}
         <div
-          className={`absolute top-0 left-0 h-full w-[85%] sm:w-[90%] md:w-[650px] z-20 bg-blue-600 border-r shadow-lg transform transition-all duration-300 ease-in-out ${
-            showSidebar
-              ? "translate-x-0 opacity-100"
-              : "-translate-x-full opacity-0"
-          }`}
+          className={`absolute top-0 left-0 h-full w-[85%] sm:w-[90%] md:w-[650px] z-20 bg-blue-600 border-r shadow-lg transform transition-all duration-300 ease-in-out ${showSidebar
+            ? "translate-x-0 opacity-100"
+            : "-translate-x-full opacity-0"
+            }`}
         >
           {/* รายการการ์ด - มี scroll แต่ซ่อน scrollbar - ลด padding ในมือถือ */}
           <div className="flex-1 overflow-y-auto p-2 sm:p-4 scrollbar-hide max-h-screen-minus-70">
