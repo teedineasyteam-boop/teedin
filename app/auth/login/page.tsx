@@ -15,11 +15,18 @@ function LoginPageContent() {
   const addAccount = searchParams.get("add_account") === "true";
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false); // New state for closing/cancelling animation
+  const [addingAccountName, setAddingAccountName] = useState<string | null>(
+    null
+  );
   const { user, isLoggedIn, reActivateCurrentSession } = useAuth(); // ดึงข้อมูล user, isLoggedIn, และ reActivateCurrentSession
 
   useEffect(() => {
     // Open the drawer after mount
     setIsOpen(true);
+    if (typeof window !== "undefined") {
+      const name = localStorage.getItem("addingAccountName");
+      if (name) setAddingAccountName(name);
+    }
   }, []);
 
   const handleClose = async () => {
@@ -36,7 +43,8 @@ function LoginPageContent() {
         try {
           const addingAccountFrom = localStorage.getItem("addingAccountFrom");
           const returnToPath =
-            localStorage.getItem("return_to_after_add_account") || "/dashboard"; // Default to /dashboard
+            localStorage.getItem("return_to_after_add_account") ||
+            "/dashboard/agent"; // Default to /dashboard/agent as requested
 
           if (addingAccountFrom) {
             console.log(
@@ -44,10 +52,13 @@ function LoginPageContent() {
               addingAccountFrom
             );
             await reActivateCurrentSession(addingAccountFrom); // Call the new function
+            // Note: reActivateCurrentSession usually reloads the page if successful.
+            // If it returns, we redirect manually just in case.
           }
 
           localStorage.removeItem("isAddingAccount");
           localStorage.removeItem("addingAccountFrom");
+          localStorage.removeItem("addingAccountName"); // Clean up name
           localStorage.removeItem("return_to_after_add_account"); // Clean up return path
 
           window.location.href = returnToPath; // Redirect to the saved path
@@ -57,10 +68,10 @@ function LoginPageContent() {
             "Error cancelling add account or restoring session:",
             e
           );
+          // Fallback if session restoration fails
+          router.push("/auth/login");
         }
       }
-
-      router.push("/dashboard");
     } else {
       router.push("/");
     }
@@ -133,6 +144,17 @@ function LoginPageContent() {
                   <p className="text-md opacity-80 mt-2">
                     เพิ่มบัญชีอื่นเพื่อสลับใช้งานได้ง่ายขึ้น
                   </p>
+                </>
+              ) : addingAccountName ? (
+                <>
+                  <p className="text-lg opacity-80 mb-2">
+                    เชื่อมต่อกับบัญชีหลักของคุณ:
+                  </p>
+                  <p className="text-2xl font-bold text-blue-400 mb-4">
+                    {addingAccountName}
+                  </p>
+                  <div className="h-px w-20 bg-white/20 mx-auto my-4" />
+                  <p className="text-xl font-semibold">กำลังเพิ่มบัญชีใหม่...</p>
                 </>
               ) : (
                 <p className="text-xl font-semibold">

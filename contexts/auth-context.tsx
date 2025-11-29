@@ -629,6 +629,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Save current state before redirecting
     if (user) {
       localStorage.setItem("addingAccountFrom", user.id);
+      localStorage.setItem(
+        "addingAccountName",
+        user.user_metadata?.first_name || user.email || "ผู้ใช้"
+      );
     }
     localStorage.setItem("isAddingAccount", "true");
 
