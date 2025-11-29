@@ -99,93 +99,27 @@ export function LogoutConfirmationModal({
   }, [isOpen, user?.id]);
 
   const handleLogout = async () => {
-    if (isLoading) return; // Prevent multiple clicks
+    if (isLoading) return;
 
     setIsLoading(true);
     try {
-      // ออกจากระบบผ่าน AuthContext ที่เชื่อมต่อกับ Supabase (public client เท่านั้น)
+      console.log("[LOGOUT-MODAL] handleLogout started");
+
+      // Call authLogout from context
+      console.log("[LOGOUT-MODAL] Calling authLogout");
       await authLogout();
 
-      // ลบเฉพาะ public session items จาก localStorage (ไม่ลบ super admin)
-      const publicKeys = [
-        "isLoggedIn",
-        "userRole",
-        "userData",
-        "rememberMe",
-        "property-data-cache",
-        "property-data-cache-expiry",
-        "tedin_session_state", // session sync
-      ];
-      publicKeys.forEach(key => {
-        localStorage.removeItem(key);
-        sessionStorage.removeItem(key);
-      });
+      // Small delay to ensure state is reset
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-      // ลบ Supabase auth tokens จาก public client (ไม่ลบ super admin)
-      // Supabase default client ใช้ keys ในรูปแบบ sb-<project-ref>-auth-token
-      // แต่เนื่องจากเราใช้ localStorage/sessionStorage เป็นหลัก เราต้องลบ keys เหล่านี้
-      const supabaseKeys: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith("sb-") || key.includes("supabase.auth"))) {
-          // ข้าม super admin keys
-          if (!key.includes("super-admin") && !key.includes("sb-super-admin")) {
-            supabaseKeys.push(key);
-          }
-        }
-      }
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key && (key.startsWith("sb-") || key.includes("supabase.auth"))) {
-          // ข้าม super admin keys
-          if (!key.includes("super-admin") && !key.includes("sb-super-admin")) {
-            supabaseKeys.push(key);
-          }
-        }
-      }
-      supabaseKeys.forEach(key => {
-        localStorage.removeItem(key);
-        sessionStorage.removeItem(key);
-      });
+      console.log("[LOGOUT-MODAL] Logout completed, redirecting");
 
-      // ลบเฉพาะ public cookies (ไม่ลบ super admin cookies)
-      // Supabase default client ใช้ localStorage/sessionStorage เป็นหลัก
-      // แต่ถ้ามี cookies ที่เกี่ยวข้องกับ public auth ก็ต้องลบ
-      const cookiesToDelete: string[] = [];
-      document.cookie.split(";").forEach(function (c) {
-        const cookieName = c.split("=")[0].trim();
-        // ข้าม super admin cookies
-        if (cookieName.startsWith(SUPER_ADMIN_COOKIE_NAME)) {
-          return;
-        }
-        // ข้าม cookies อื่นๆ ที่ไม่ใช่ public auth (เช่น language, sidebar state)
-        if (
-          cookieName === "lang" ||
-          cookieName.startsWith("sidebar-") ||
-          cookieName.startsWith("tedin-")
-        ) {
-          return;
-        }
-        // ลบเฉพาะ cookies ที่เกี่ยวข้องกับ Supabase public auth
-        // Supabase อาจจะสร้าง cookies ในรูปแบบ sb-<project-ref>-auth-token
-        // แต่เนื่องจากเราใช้ localStorage/sessionStorage เป็นหลัก cookies เหล่านี้อาจจะไม่มี
-        // แต่ถ้ามีก็ต้องลบ (ยกเว้น super admin)
-        cookiesToDelete.push(cookieName);
-      });
-
-      // ลบ cookies ที่เก็บไว้
-      cookiesToDelete.forEach(cookieName => {
-        // ลบ cookie ทุก path และ domain
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname};`;
-        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${window.location.hostname};`;
-      });
-
-      // Redirect to home page โดยใช้ replace เพื่อป้องกัน back button
-      window.location.replace("/");
+      // Redirect to home page
+      window.location.href = "/";
     } catch (error) {
-      console.error("Logout error:", error);
-      setIsLoading(false); // Reset loading state on error
+      console.error("[LOGOUT-MODAL] Logout error:", error);
+      setIsLoading(false);
+      alert("เกิดข้อผิดพลาดในการออกจากระบบ");
     }
   };
 

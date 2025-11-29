@@ -11,9 +11,7 @@ export default function AgentDashboardPage() {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{t("agent_dashboard_title")}</h1>
-      </div>
+     
 
       <AgentChart agentId={agentId} agentName={user?.email ?? undefined} />
     </div>

@@ -1900,199 +1900,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Helper function to check if super admin session exists
-  const checkSuperAdminSession = async (): Promise<boolean> => {
-    try {
-      if (typeof window === "undefined") {
-        return false;
-      }
-
-      // Method 1: Check cookies (fast check)
-      const allCookies = document.cookie.split(";");
-      const hasCookie = allCookies.some(c => {
-        const cookieName = c.split("=")[0].trim();
-        return (
-          cookieName === SUPER_ADMIN_COOKIE_NAME ||
-          cookieName.startsWith(SUPER_ADMIN_COOKIE_NAME + "-") ||
-          cookieName.startsWith(SUPER_ADMIN_COOKIE_NAME + ".")
-        );
-      });
-
-      // Method 2: Verify by checking super admin client session (more reliable)
-      // ตรวจสอบจาก super admin client โดยตรงเพื่อความแน่ใจ
-      // เพิ่ม timeout เพื่อป้องกันการค้าง
-      try {
-        const timeoutPromise = new Promise<boolean>((resolve) => {
-          setTimeout(() => resolve(hasCookie), 2000); // 2 second timeout
-        });
-
-        const checkPromise = (async () => {
-          const superAdminClient = getSuperAdminBrowserClient();
-          const {
-            data: { session },
-            error,
-          } = await superAdminClient.auth.getSession();
-
-          if (session && !error) {
-            // Verify user role is admin
-            const { data: profile } = await superAdminClient
-              .from("users")
-              .select("role")
-              .eq("id", session.user.id)
-              .single();
-
-            if (profile && profile.role === "admin") {
-              return true;
-            }
-          }
-          return false;
-        })();
-
-        // Race between timeout and actual check
-        return await Promise.race([checkPromise, timeoutPromise]);
-      } catch (err) {
-        // If super admin client check fails, fallback to cookie check
-        return hasCookie;
-      }
-    } catch (error) {
-      return false;
-    }
-  };
-
-  // Logout function using Supabase
+  // Logout function - Simple and reliable
   const logout = async () => {
     try {
-      // ตรวจสอบว่ามี super admin session หรือไม่
-      // ถ้ามี super admin session ให้ไม่ signOut จาก backend เลย
-      // เพราะ Supabase Auth ใช้ session เดียวกันใน backend สำหรับ user เดียวกัน
-      // การ signOut จะทำให้ session ทั้งหมดหมดอายุ รวมถึง super admin session
-      const hasSuperAdminSession = await checkSuperAdminSession();
+      console.log("[LOGOUT] Starting logout process");
 
-      if (hasSuperAdminSession) {
-        // ถ้ามี super admin session ให้ลบเฉพาะ public session จาก storage
-        // แต่ไม่ signOut จาก backend เพื่อไม่ให้กระทบ super admin session
-
-        // ลบ Supabase auth tokens จาก public client
-        const publicStorageKeys = ["sb-", "supabase.auth.token"];
-
-        // ลบ Supabase auth tokens จาก localStorage
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (
-            key &&
-            (publicStorageKeys.some(prefix => key.startsWith(prefix)) ||
-              key.includes("supabase.auth"))
-          ) {
-            // ข้าม super admin keys
-            if (
-              !key.includes("super-admin") &&
-              !key.includes("sb-super-admin")
-            ) {
-              keysToRemove.push(key);
-            }
-          }
-        }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
-
-        // ลบ Supabase auth tokens จาก sessionStorage
-        const sessionKeysToRemove: string[] = [];
-        for (let i = 0; i < sessionStorage.length; i++) {
-          const key = sessionStorage.key(i);
-          if (
-            key &&
-            (publicStorageKeys.some(prefix => key.startsWith(prefix)) ||
-              key.includes("supabase.auth"))
-          ) {
-            // ข้าม super admin keys
-            if (
-              !key.includes("super-admin") &&
-              !key.includes("sb-super-admin")
-            ) {
-              sessionKeysToRemove.push(key);
-            }
-          }
-        }
-        sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
-      } else {
-        // ถ้าไม่มี super admin session ให้ signOut จาก backend ตามปกติ
-        // แต่ต้องแน่ใจว่าไม่มี super admin session จริงๆ
-        // ตรวจสอบอีกครั้งก่อน signOut เพื่อความแน่ใจ
-        const doubleCheck = await checkSuperAdminSession();
-        if (doubleCheck) {
-          // ถ้าพบ super admin session ให้ทำเหมือนมี session
-          // ลบเฉพาะ public session จาก storage
-          const publicStorageKeys = ["sb-", "supabase.auth.token"];
-
-          const keysToRemove: string[] = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (
-              key &&
-              (publicStorageKeys.some(prefix => key.startsWith(prefix)) ||
-                key.includes("supabase.auth"))
-            ) {
-              if (
-                !key.includes("super-admin") &&
-                !key.includes("sb-super-admin")
-              ) {
-                keysToRemove.push(key);
-              }
-            }
-          }
-          keysToRemove.forEach(key => localStorage.removeItem(key));
-
-          const sessionKeysToRemove: string[] = [];
-          for (let i = 0; i < sessionStorage.length; i++) {
-            const key = sessionStorage.key(i);
-            if (
-              key &&
-              (publicStorageKeys.some(prefix => key.startsWith(prefix)) ||
-                key.includes("supabase.auth"))
-            ) {
-              if (
-                !key.includes("super-admin") &&
-                !key.includes("sb-super-admin")
-              ) {
-                sessionKeysToRemove.push(key);
-              }
-            }
-          }
-          sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
-        } else {
-          await supabase.auth.signOut();
-        }
-      }
-
-      // ลบ public session data (ไม่กระทบ super admin)
-      localStorage.removeItem("isLoggedIn");
-      localStorage.removeItem("userRole");
-      localStorage.removeItem("baseRole"); // Remove baseRole
-      localStorage.removeItem("userData");
-      localStorage.removeItem("rememberMe");
-      localStorage.removeItem("tedin_accounts"); // Clear active accounts list on logout
-      localStorage.removeItem("isAddingAccount"); // Clear add account flag
-      localStorage.removeItem("addingAccountFrom"); // Clear add account source
-
-      sessionStorage.removeItem("isLoggedIn");
-      sessionStorage.removeItem("userRole");
-      sessionStorage.removeItem("baseRole"); // Remove baseRole
-      sessionStorage.removeItem("userData");
-      // เคลียร์ cache ข้อมูลอสังหาเมื่อออกจากระบบ
-      try {
-        localStorage.removeItem("property-data-cache");
-        localStorage.removeItem("property-data-cache-expiry");
-      } catch (_) { }
-
-      // Reset state
+      // 1. Reset React state immediately (don't wait for backend)
+      console.log("[LOGOUT] Resetting React state");
       setIsLoggedIn(false);
       setUserRole(null);
-      setBaseRole(null); // Reset baseRole
+      setBaseRole(null);
       setUser(null);
       setSession(null);
-      setAccounts([]); // Clear accounts state on logout
+      setAccounts([]);
+
+      // 2. Clear localStorage
+      console.log("[LOGOUT] Clearing localStorage");
+      const localStorageKeys = [
+        "isLoggedIn",
+        "userRole",
+        "baseRole",
+        "userData",
+        "rememberMe",
+        "tedin_accounts",
+        "isAddingAccount",
+        "addingAccountFrom",
+        "property-data-cache",
+        "property-data-cache-expiry",
+        "tedin_session_state",
+        "dashboard-account-cache-v1",
+      ];
+      localStorageKeys.forEach(key => {
+        try {
+          localStorage.removeItem(key);
+        } catch (e) {
+          console.warn(`[LOGOUT] Failed to remove localStorage key: ${key}`, e);
+        }
+      });
+
+      // 3. Clear sessionStorage
+      console.log("[LOGOUT] Clearing sessionStorage");
+      const sessionStorageKeys = [
+        "isLoggedIn",
+        "userRole",
+        "baseRole",
+        "userData",
+        "tedin_session_state",
+      ];
+      sessionStorageKeys.forEach(key => {
+        try {
+          sessionStorage.removeItem(key);
+        } catch (e) {
+          console.warn(`[LOGOUT] Failed to remove sessionStorage key: ${key}`, e);
+        }
+      });
+
+      // 4. SignOut from Supabase backend (async, don't wait)
+      console.log("[LOGOUT] Signing out from Supabase (async)");
+      supabase.auth.signOut().catch(err => {
+        console.warn("[LOGOUT] Supabase signOut error (non-blocking):", err);
+      });
+
+      console.log("[LOGOUT] Logout completed successfully");
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("[LOGOUT] Logout error:", error);
+      // Even if there's an error, still reset state
+      setIsLoggedIn(false);
+      setUserRole(null);
+      setBaseRole(null);
+      setUser(null);
+      setSession(null);
+      setAccounts([]);
+      throw error;
     }
   };
 

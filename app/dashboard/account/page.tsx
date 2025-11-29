@@ -24,7 +24,6 @@ import {
   Bell,
   Building,
   Pencil,
-  Shield,
   User,
   UserCheck,
 } from "lucide-react";
@@ -77,6 +76,9 @@ export default function AccountPage() {
   const [openLast, setOpenLast] = useState(false);
   const [openPhone, setOpenPhone] = useState(false);
   const [avatarColor, setAvatarColor] = useState("#60a5fa");
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [smsNotifications, setSmsNotifications] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
   const CACHE_KEY = "dashboard-account-cache-v1";
   const [hasCachedProfile] = useState(Boolean(initialCache?.profile));
 
@@ -225,6 +227,30 @@ export default function AccountPage() {
     };
   }, [user?.id, hasCachedProfile]);
 
+  // Load notification settings
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchNotificationSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("email_notifications, sms_notifications")
+          .eq("id", user.id)
+          .single();
+
+        if (!error && data) {
+          setEmailNotifications(data.email_notifications ?? true);
+          setSmsNotifications(data.sms_notifications ?? false);
+        }
+      } catch (err) {
+        console.error("Error fetching notification settings:", err);
+      }
+    };
+
+    fetchNotificationSettings();
+  }, [user?.id]);
+
   // Separate effect for boosts to ensure it's always fresh and not tied to profile caching logic
   useEffect(() => {
     if (!user?.id) return;
@@ -335,6 +361,48 @@ export default function AccountPage() {
     profile.first_name,
     profile.last_name,
   ]);
+
+  const handleNotificationChange = async (
+    type: "email" | "sms",
+    enabled: boolean
+  ) => {
+    setNotificationLoading(true);
+    try {
+      if (!user?.id) return;
+
+      const { error } = await supabase
+        .from("users")
+        .update({
+          [type === "email" ? "email_notifications" : "sms_notifications"]:
+            enabled,
+        })
+        .eq("id", user.id);
+
+      if (error) {
+        console.error("Error updating notification settings:", error);
+        alert(`${t("error")}: ${error.message}`);
+        return;
+      }
+
+      if (type === "email") {
+        setEmailNotifications(enabled);
+      } else {
+        setSmsNotifications(enabled);
+      }
+
+      // Show success message
+      console.log(
+        `${type === "email" ? "Email" : "SMS"} notifications ${
+          enabled ? "enabled" : "disabled"
+        }`
+      );
+    } catch (err) {
+      console.error("Error:", err);
+      alert(t("error"));
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
 
   const InfoRow = ({
     label,
@@ -457,10 +525,6 @@ export default function AccountPage() {
                 <UserCheck className="w-4 h-4 mr-2" />
               )}
               {t("account_profile_tab")}
-            </TabsTrigger>
-            <TabsTrigger value="security">
-              <Shield className="w-4 h-4 mr-2" />
-              {t("account_security_tab")}
             </TabsTrigger>
             <TabsTrigger value="notifications">
               <Bell className="w-4 h-4 mr-2" />
@@ -586,29 +650,6 @@ export default function AccountPage() {
             </Card>
           </TabsContent>
 
-          {/* Security Tab */}
-          <TabsContent value="security">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("account_security_title")}</CardTitle>
-                <CardDescription>{t("account_security_desc")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>{t("account_password_label")}</Label>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-sm text-gray-500">
-                      {t("account_password_hint")}
-                    </p>
-                    <Button variant="outline">
-                      {t("account_change_password")}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Notifications Tab */}
           <TabsContent value="notifications">
             <Card>
@@ -631,7 +672,14 @@ export default function AccountPage() {
                       {t("account_notifications_email_desc")}
                     </p>
                   </div>
-                  <Switch id="email-notifications" defaultChecked />
+                  <Switch
+                    id="email-notifications"
+                    checked={emailNotifications}
+                    onCheckedChange={(checked) =>
+                      handleNotificationChange("email", checked)
+                    }
+                    disabled={notificationLoading}
+                  />
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-lg border">
                   <div>
@@ -642,7 +690,14 @@ export default function AccountPage() {
                       {t("account_notifications_sms_desc")}
                     </p>
                   </div>
-                  <Switch id="sms-notifications" />
+                  <Switch
+                    id="sms-notifications"
+                    checked={smsNotifications}
+                    onCheckedChange={(checked) =>
+                      handleNotificationChange("sms", checked)
+                    }
+                    disabled={notificationLoading}
+                  />
                 </div>
               </CardContent>
             </Card>
