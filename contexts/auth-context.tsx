@@ -49,6 +49,7 @@ interface AuthContextType {
   switchAccount: (userId: string) => Promise<void>;
   addAccount: () => void; // Redirects to login to add account
   removeAccount: (userId: string) => Promise<void>;
+  reActivateCurrentSession: (userId: string) => Promise<void>;
 
   setUser: (user: User | null) => void;
   setSession: (session: Session | null) => void;
@@ -108,6 +109,7 @@ const AuthContext = createContext<AuthContextType>({
   switchAccount: async () => { },
   addAccount: () => { },
   removeAccount: async () => { },
+  reActivateCurrentSession: async () => { },
 
   setUser: () => { },
   setSession: () => { },
@@ -686,6 +688,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         await logout();
       }
+    }
+  };
+
+  const reActivateCurrentSession = async (userId: string) => {
+    // Re-activate a session by switching to it (similar to switchAccount)
+    const targetAccount = accounts.find(a => a.user.id === userId);
+    if (!targetAccount) {
+      console.error("Account not found:", userId);
+      return;
+    }
+
+    try {
+      console.log("Re-activating session for:", userId);
+      await switchAccount(userId);
+    } catch (error) {
+      console.error("Error re-activating session:", error);
+      throw error;
     }
   };
 
@@ -2072,6 +2091,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         switchAccount,
         addAccount,
         removeAccount,
+        reActivateCurrentSession,
 
         setUser,
         setSession,

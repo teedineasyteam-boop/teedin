@@ -14,6 +14,7 @@ interface LoginDrawerProps {
   onLoginSuccess?: () => void;
   showSuccessModal?: boolean;
   onSwitchToRegister?: () => void;
+  isAddAccountMode?: boolean;
 }
 
 export function LoginDrawer({
@@ -22,6 +23,7 @@ export function LoginDrawer({
   onLoginSuccess,
   showSuccessModal = false,
   onSwitchToRegister,
+  isAddAccountMode = false,
 }: LoginDrawerProps) {
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [password, setPassword] = useState("");
