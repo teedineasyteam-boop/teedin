@@ -24,6 +24,7 @@ import {
   Bell,
   Building,
   Pencil,
+  Shield,
   User,
   UserCheck,
 } from "lucide-react";
@@ -37,16 +38,26 @@ export default function AccountPage() {
   const { user, isLoggedIn, loading: authLoading, userRole } = useAuth();
   const { t } = useLanguage();
   const router = useRouter();
-  const [initialCache] = useState(() => {
+  // Types for cached payload
+  type Profile = {
+    role?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    [key: string]: any;
+  };
+  type Agent = any;
+  type Customer = any;
+
+  const [initialCache] = useState<
+    { profile?: Profile; agent?: Agent; customer?: Customer } | null
+  >(() => {
     if (typeof window === "undefined") return null;
     try {
       const cached = localStorage.getItem("dashboard-account-cache-v1");
       return cached
-        ? (JSON.parse(cached) as {
-            profile?: typeof profile;
-            agent?: typeof agent;
-            customer?: typeof customer;
-          })
+        ? (JSON.parse(cached) as { profile?: Profile; agent?: Agent; customer?: Customer })
         : null;
     } catch {
       return null;
@@ -82,11 +93,7 @@ export default function AccountPage() {
   const CACHE_KEY = "dashboard-account-cache-v1";
   const [hasCachedProfile] = useState(Boolean(initialCache?.profile));
 
-  const persistCache = (next?: {
-    profile?: typeof profile;
-    agent?: typeof agent;
-    customer?: typeof customer;
-  }) => {
+  const persistCache = (next?: { profile?: Profile; agent?: Agent; customer?: Customer }) => {
     try {
       const payload = {
         profile: next?.profile ?? profile,
@@ -513,7 +520,7 @@ export default function AccountPage() {
 
         {/* Tabs */}
         <Tabs defaultValue="account" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+          <TabsList className="flex flex-wrap justify-center gap-4 w-full">
             <TabsTrigger value="account">
               <User className="w-4 h-4 mr-2" />
               {t("account_title")}
@@ -526,6 +533,7 @@ export default function AccountPage() {
               )}
               {t("account_profile_tab")}
             </TabsTrigger>
+            
             <TabsTrigger value="notifications">
               <Bell className="w-4 h-4 mr-2" />
               {t("account_notifications_tab")}
@@ -649,6 +657,8 @@ export default function AccountPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          
 
           {/* Notifications Tab */}
           <TabsContent value="notifications">

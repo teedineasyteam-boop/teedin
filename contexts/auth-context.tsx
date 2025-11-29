@@ -1957,7 +1957,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // 4. SignOut from Supabase backend (async, don't wait)
       console.log("[LOGOUT] Signing out from Supabase (async)");
-      supabase.auth.signOut().catch(err => {
+      supabase.auth.signOut().catch((err: any) => {
         console.warn("[LOGOUT] Supabase signOut error (non-blocking):", err);
       });
 
