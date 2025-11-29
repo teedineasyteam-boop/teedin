@@ -50,6 +50,7 @@ const BeamGridBackground: React.FC<BeamGridBackgroundProps> = ({
   const [isDarkMode, setIsDarkMode] = useState(false);
   const mouseRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastMouseMoveRef = useRef(Date.now());
+  const animationFrameId = useRef<number>(0);
 
   useEffect(() => {
     const updateDarkMode = () => {
@@ -75,8 +76,14 @@ const BeamGridBackground: React.FC<BeamGridBackgroundProps> = ({
     if (!ctx) return;
 
     const rect = container.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    // Handle high DPI displays for sharper rendering
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    // CSS size ensures it fits the container
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
 
     const cols = Math.floor(rect.width / gridSize);
     const rows = Math.floor(rect.height / gridSize);
@@ -110,29 +117,34 @@ const BeamGridBackground: React.FC<BeamGridBackgroundProps> = ({
 
     if (interactive) window.addEventListener("mousemove", updateMouse);
 
-    const draw = () => {
+    let lastTime = performance.now();
+
+    const draw = (time: number) => {
+      const dt = (time - lastTime) / 16.67; // Normalize to roughly 60fps (1.0 at 60fps)
+      lastTime = time;
+
       ctx.clearRect(0, 0, rect.width, rect.height);
 
       const lineColor = isDarkMode ? darkGridColor : gridColor;
       const activeBeamColor = isDarkMode ? darkBeamColor : beamColor;
 
+      // Batch grid drawing - HUGE performance improvement
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1;
+      ctx.beginPath();
       for (let x = 0; x <= rect.width; x += gridSize) {
-        ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, rect.height);
-        ctx.stroke();
       }
       for (let y = 0; y <= rect.height; y += gridSize) {
-        ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(rect.width, y);
-        ctx.stroke();
       }
+      ctx.stroke();
 
       const now = Date.now();
       const idle = now - lastMouseMoveRef.current > 2000;
+      const speedMultiplier = idle ? idleSpeed : 1;
 
       allBeams.forEach(beam => {
         ctx.strokeStyle = activeBeamColor;
@@ -156,7 +168,8 @@ const BeamGridBackground: React.FC<BeamGridBackgroundProps> = ({
           ctx.lineTo(start + beamLength, y);
           ctx.stroke();
 
-          beam.offset += idle ? beam.speed * idleSpeed * 60 : beam.speed * 60;
+          // Use delta time for smooth movement
+          beam.offset += beam.speed * speedMultiplier * 6 * dt;
           if (beam.offset > rect.width + beamLength) beam.offset = -beamLength;
         } else {
           const x = beam.x * gridSize;
@@ -168,7 +181,8 @@ const BeamGridBackground: React.FC<BeamGridBackgroundProps> = ({
           ctx.lineTo(x, start + beamLength);
           ctx.stroke();
 
-          beam.offset += idle ? beam.speed * idleSpeed * 60 : beam.speed * 60;
+          // Use delta time for smooth movement
+          beam.offset += beam.speed * speedMultiplier * 6 * dt;
           if (beam.offset > rect.height + beamLength) beam.offset = -beamLength;
         }
       });
@@ -236,13 +250,14 @@ const BeamGridBackground: React.FC<BeamGridBackgroundProps> = ({
         });
       }
 
-      requestAnimationFrame(draw);
+      animationFrameId.current = requestAnimationFrame(draw);
     };
 
-    draw();
+    animationFrameId.current = requestAnimationFrame(draw);
 
     return () => {
       if (interactive) window.removeEventListener("mousemove", updateMouse);
+      cancelAnimationFrame(animationFrameId.current);
     };
   }, [
     gridSize,
