@@ -7,14 +7,16 @@ const translations: Record<string, Record<string, string>> = {
     property_not_found: "ไม่พบรายการนี้",
     customer_already_exists: "ลูกค้าคนนี้มีรายการนี้อยู่แล้ว",
     update_failed: "ไม่สามารถอัปเดตข้อมูลได้",
-    customer_notification_title: "เช่าสำเร็จ",
+    customer_notification_title_rented: "เช่าสำเร็จ",
+    customer_notification_title_sold: "ทำสัญญาขายสำเร็จ",
     customer_notification_message: "คุณได้รับการเพิ่มเป็นเจ้าของรายการนี้แล้ว",
   },
   en: {
     property_not_found: "Property not found",
     customer_already_exists: "This customer already has this property",
     update_failed: "Failed to update data",
-    customer_notification_title: "Rental Successful",
+    customer_notification_title_rented: "Rental Successful",
+    customer_notification_title_sold: "Sale Contract Successful",
     customer_notification_message:
       "You have been added as the owner of this property",
   },
@@ -85,14 +87,22 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // สร้างการแจ้งเตือนให้ลูกค้า
+    // สร้างการแจ้งเตือนให้ลูกค้า (เลือกหัวข้อขึ้นอยู่กับสถานะที่อัปเดต)
     try {
+      const updatedStatus = Array.isArray(data) && data.length > 0
+        ? data[0]?.status
+        : (data as any)?.status || "rented";
+
+      const titleKey = updatedStatus === "sold"
+        ? "customer_notification_title_sold"
+        : "customer_notification_title_rented";
+
       await supabase.from("notifications").insert([
         {
           sender_id: agentId, // Agent ที่เพิ่มลูกค้า
           receiver_id: customerId,
           message: t("customer_notification_message", language),
-          headder: t("customer_notification_title", language),
+          headder: t(titleKey, language),
           read: "false",
           role: "agent",
           is_read: false,
