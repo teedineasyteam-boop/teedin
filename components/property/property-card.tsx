@@ -27,13 +27,13 @@ export interface PropertyData {
   id: string;
   title: string;
   location:
-    | string
-    | {
-        address?: string;
-        ที่อยู่?: string;
-        latitude?: number;
-        longitude?: number;
-      };
+  | string
+  | {
+    address?: string;
+    ที่อยู่?: string;
+    latitude?: number;
+    longitude?: number;
+  };
   price: string;
   isPricePerMonth?: boolean;
   details: PropertyDetails;
@@ -458,9 +458,8 @@ const PropertyActions = memo(
   }) => (
     <div className="absolute top-3 right-3 flex space-x-1 z-10">
       <button
-        className={`bg-white/90 backdrop-blur-sm p-2 rounded-full hover:bg-white transition-colors shadow-md ${
-          isLoading ? "opacity-50 cursor-not-allowed" : ""
-        }`}
+        className={`bg-white/90 backdrop-blur-sm p-2 rounded-full hover:bg-white transition-colors shadow-md ${isLoading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
         onClick={onLike}
         disabled={isLoading}
         title={t(
@@ -475,9 +474,8 @@ const PropertyActions = memo(
         )}
       >
         <Heart
-          className={`h-4 w-4 ${
-            isLiked ? "text-red-500 fill-red-500" : "text-gray-600"
-          }`}
+          className={`h-4 w-4 ${isLiked ? "text-red-500 fill-red-500" : "text-gray-600"
+            }`}
         />
       </button>
       <button
@@ -599,8 +597,8 @@ const NegotiationDetails = memo(
           </span>{" "}
           {negotiation.offered_price
             ? `${Number(negotiation.offered_price).toLocaleString()} ${t(
-                "property_card_price_suffix"
-              )}`
+              "property_card_price_suffix"
+            )}`
             : "-"}
         </div>
         <div>
@@ -712,9 +710,8 @@ const AppointmentDetails = memo(
             <span className="font-semibold">
               {t("property_card_appointment_name_label")}
             </span>
-            {` ${property.customer_user?.first_name || ""} ${
-              property.customer_user?.last_name || ""
-            }`.trim() || "-"}
+            {` ${property.customer_user?.first_name || ""} ${property.customer_user?.last_name || ""
+              }`.trim() || "-"}
           </div>
           <div>
             <span className="font-semibold">
@@ -1020,13 +1017,11 @@ export const PropertyCard = memo(
 
     return (
       <div
-        className={`group bg-white rounded-xl overflow-hidden shadow-sm border ${
-          isTopPick
+        className={`group bg-white rounded-xl overflow-hidden shadow-sm border ${isTopPick
             ? "border-amber-400 ring-1 ring-amber-100"
             : "border-gray-100"
-        } hover:shadow-lg transition-all duration-300 flex flex-col relative font-ibm-plex-sans-thai ${
-          isShaking ? "shake-effect" : ""
-        }`}
+          } hover:shadow-lg transition-all duration-300 flex flex-col relative font-ibm-plex-sans-thai ${isShaking ? "shake-effect" : ""
+          }`}
       >
         <div className="relative">
           <Link

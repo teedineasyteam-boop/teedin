@@ -101,16 +101,16 @@ const AuthContext = createContext<AuthContextType>({
   baseRole: null, // Added baseRole
   isAdmin: false,
   isSuperAdmin: false,
-  setIsLoggedIn: () => {},
-  setUserRole: () => {},
+  setIsLoggedIn: () => { },
+  setUserRole: () => { },
 
   accounts: [],
-  switchAccount: async () => {},
-  addAccount: () => {},
-  removeAccount: async () => {},
+  switchAccount: async () => { },
+  addAccount: () => { },
+  removeAccount: async () => { },
 
-  setUser: () => {},
-  setSession: () => {},
+  setUser: () => { },
+  setSession: () => { },
   login: async (
     emailOrPhone: string,
     password: string,
@@ -129,7 +129,7 @@ const AuthContext = createContext<AuthContextType>({
   sendPasswordResetOtp: async () => ({ error: null }),
   verifyPasswordResetOtp: async () => ({ error: null }),
   resetPassword: async () => ({ error: null }),
-  logout: async () => {},
+  logout: async () => { },
   user: null,
   session: null,
   loading: true,
@@ -307,7 +307,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   localStorage.setItem("tedin_accounts", backup);
                 }
               }
-            } catch (e) {}
+            } catch (e) { }
           }
         }
 
@@ -546,7 +546,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .hostname;
             const projectRef = hostname.split(".")[0];
             sbKey = `sb-${projectRef}-auth-token`;
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (sbKey) {
@@ -1920,31 +1920,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Method 2: Verify by checking super admin client session (more reliable)
       // ตรวจสอบจาก super admin client โดยตรงเพื่อความแน่ใจ
+      // เพิ่ม timeout เพื่อป้องกันการค้าง
       try {
-        const superAdminClient = getSuperAdminBrowserClient();
-        const {
-          data: { session },
-          error,
-        } = await superAdminClient.auth.getSession();
+        const timeoutPromise = new Promise<boolean>((resolve) => {
+          setTimeout(() => resolve(hasCookie), 2000); // 2 second timeout
+        });
 
-        if (session && !error) {
-          // Verify user role is admin
-          const { data: profile } = await superAdminClient
-            .from("users")
-            .select("role")
-            .eq("id", session.user.id)
-            .single();
+        const checkPromise = (async () => {
+          const superAdminClient = getSuperAdminBrowserClient();
+          const {
+            data: { session },
+            error,
+          } = await superAdminClient.auth.getSession();
 
-          if (profile && profile.role === "admin") {
-            return true;
+          if (session && !error) {
+            // Verify user role is admin
+            const { data: profile } = await superAdminClient
+              .from("users")
+              .select("role")
+              .eq("id", session.user.id)
+              .single();
+
+            if (profile && profile.role === "admin") {
+              return true;
+            }
           }
-        }
+          return false;
+        })();
+
+        // Race between timeout and actual check
+        return await Promise.race([checkPromise, timeoutPromise]);
       } catch (err) {
         // If super admin client check fails, fallback to cookie check
         return hasCookie;
       }
-
-      return false;
     } catch (error) {
       return false;
     }
@@ -2073,7 +2082,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         localStorage.removeItem("property-data-cache");
         localStorage.removeItem("property-data-cache-expiry");
-      } catch (_) {}
+      } catch (_) { }
 
       // Reset state
       setIsLoggedIn(false);

@@ -29,6 +29,7 @@ export function LogoutConfirmationModal({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initials, setInitials] = useState<string>("");
   const [avatarColor, setAvatarColor] = useState<string>("#60a5fa"); // default blue-400
+  const [isLoading, setIsLoading] = useState(false);
 
   // Derived colors (memoized to avoid recalculation each render)
   const derived = useMemo(() => deriveAvatarTheme(avatarColor), [avatarColor]);
@@ -98,6 +99,9 @@ export function LogoutConfirmationModal({
   }, [isOpen, user?.id]);
 
   const handleLogout = async () => {
+    if (isLoading) return; // Prevent multiple clicks
+
+    setIsLoading(true);
     try {
       // ออกจากระบบผ่าน AuthContext ที่เชื่อมต่อกับ Supabase (public client เท่านั้น)
       await authLogout();
@@ -181,6 +185,7 @@ export function LogoutConfirmationModal({
       window.location.replace("/");
     } catch (error) {
       console.error("Logout error:", error);
+      setIsLoading(false); // Reset loading state on error
     }
   };
 
@@ -223,13 +228,22 @@ export function LogoutConfirmationModal({
           <div className="w-full space-y-3">
             <Button
               onClick={handleLogout}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-md"
+              disabled={isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              ยืนยัน
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  กำลังออกจากระบบ...
+                </div>
+              ) : (
+                "ยืนยัน"
+              )}
             </Button>
 
             <Button
               onClick={onClose}
+              disabled={isLoading}
               variant="outline"
               className="w-full border-gray-300 text-gray-800 font-bold py-3 rounded-md bg-white hover:bg-gray-200 disabled:text-gray-400 disabled:bg-gray-100"
             >
