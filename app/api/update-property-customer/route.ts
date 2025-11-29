@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 const translations: Record<string, Record<string, string>> = {
   th: {
     property_not_found: "ไม่พบรายการนี้",
+    property_sold: "รายการนี้ถูกขายแล้ว",
     customer_already_exists: "ลูกค้าคนนี้มีรายการนี้อยู่แล้ว",
     update_failed: "ไม่สามารถอัปเดตข้อมูลได้",
     customer_notification_title: "ทำรายการสำเร็จ",
@@ -12,6 +13,7 @@ const translations: Record<string, Record<string, string>> = {
   },
   en: {
     property_not_found: "Property not found",
+    property_sold: "This property has been sold",
     customer_already_exists: "This customer already has this property",
     update_failed: "Failed to update data",
     customer_notification_title: "Successful",
@@ -37,10 +39,10 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = createSupabaseAdmin();
 
-    // ดึง agent_id จากตาราง properties
+    // ดึง agent_id และสถานะจากตาราง properties
     const { data: propertyData, error: propertyError } = await supabase
       .from("properties")
-      .select("agent_id")
+      .select("agent_id, status")
       .eq("id", propertyId)
       .single();
 
@@ -52,6 +54,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     const agentId = propertyData.agent_id;
+
+    // หากสถานะเป็น sold ให้ไม่อนุญาตการอัปเดต (ไม่ให้แสดงในแท็บอัปเดต)
+    if (propertyData.status === "sold") {
+      return NextResponse.json({ error: t("property_sold", language) }, { status: 410 });
+    }
 
     // ตรวจสอบก่อนว่าลูกค้าคนนี้เป็นเจ้าของรายการนี้อยู่แล้วหรือไม่
     const { data: currentData, error: checkError } = await supabase

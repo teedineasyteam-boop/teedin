@@ -1671,14 +1671,18 @@ const MyAnnouncements = () => {
                                             </span>
                                           </DropdownMenuItem>
                                         )}
-                                      <DropdownMenuItem
-                                        onClick={() =>
-                                          handleOpenEmailDialog(property.id)
-                                        }
-                                      >
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        <span>{t("add_customer")}</span>
-                                      </DropdownMenuItem>
+                                      {!property.isForSale &&
+                                        !statusRaw.includes("sold") &&
+                                        !statusRaw.includes("ขาย") && (
+                                        <DropdownMenuItem
+                                          onClick={() =>
+                                            handleOpenEmailDialog(property.id)
+                                          }
+                                        >
+                                          <Plus className="mr-2 h-4 w-4" />
+                                          <span>{t("add_customer")}</span>
+                                        </DropdownMenuItem>
+                                      )}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 }
@@ -1747,14 +1751,21 @@ const MyAnnouncements = () => {
                                     <span>{t("action_mark_as_rented")}</span>
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    handleOpenEmailDialog(property.id)
-                                  }
-                                >
-                                  <Plus className="mr-2 h-4 w-4" />
-                                  <span>{t("add_customer")}</span>
-                                </DropdownMenuItem>
+                                {!property.isForSale &&
+                                  !String(property.status ?? "")
+                                    .toLowerCase()
+                                    .includes("sold") &&
+                                  !String(property.status ?? "")
+                                    .includes("ขาย") && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      handleOpenEmailDialog(property.id)
+                                    }
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    <span>{t("add_customer")}</span>
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           }
@@ -1781,17 +1792,54 @@ const MyAnnouncements = () => {
             let filteredRaw: PropertyRow[] = [];
 
             if (userRole === "customer" && user) {
-              // For customers: show properties where property_details.customer_id matches user.id
+              // For customers: show properties where property_details.customer_id matches user.id and status is not 'sold'
               filteredRaw = listingsRaw.filter(p => {
                 const detail = getPrimaryDetail(p?.property_details);
+                const detailStatus = String(detail?.status ?? "").toLowerCase();
+                const propertyStatus = String(p.status ?? "").toLowerCase();
+
+                const listingSource =
+                  p?.listing_type ??
+                  (detail as any)?.properties?.listing_type ??
+                  null;
+                const listingTypes = toCleanStringArray(listingSource).map(t =>
+                  t.toLowerCase()
+                );
+                const isListingSold = listingTypes.some(
+                  t => t.includes("sold") || t.includes("ขายแล้ว")
+                );
+
+                // Strict check for sold status
+                if (detailStatus.includes("sold") || detailStatus.includes("ขาย")) return false;
+                if (propertyStatus.includes("sold") || propertyStatus.includes("ขาย")) return false;
+                if (isListingSold) return false;
+
                 return (detail as any)?.customer_id === user.id;
               });
             } else {
-              // For agents: show properties whose property_details.status contains 'rented'
+              // For agents: show properties whose property_details.status contains 'rented' and property_details.status is not 'sold'
               filteredRaw = listingsRaw.filter(p => {
                 const detail = getPrimaryDetail(p?.property_details);
-                const s = (detail?.status ?? "").toString().toLowerCase();
-                return s.includes("rented");
+                const detailStatus = String(detail?.status ?? "").toLowerCase();
+                const propertyStatus = String(p.status ?? "").toLowerCase();
+
+                const listingSource =
+                  p?.listing_type ??
+                  (detail as any)?.properties?.listing_type ??
+                  null;
+                const listingTypes = toCleanStringArray(listingSource).map(t =>
+                  t.toLowerCase()
+                );
+                const isListingSold = listingTypes.some(
+                  t => t.includes("sold") || t.includes("ขายแล้ว")
+                );
+
+                // Strict check for sold status
+                if (detailStatus.includes("sold") || detailStatus.includes("ขาย")) return false;
+                if (propertyStatus.includes("sold") || propertyStatus.includes("ขาย")) return false;
+                if (isListingSold) return false;
+
+                return detailStatus.includes("rented");
               });
             }
 
@@ -1819,6 +1867,25 @@ const MyAnnouncements = () => {
                     propertyRow.agent_id,
                     t
                   );
+
+                  // --- AGGRESSIVE FILTERING FOR SOLD PROPERTIES ---
+                  const isSoldStatus = (s: string | undefined | null) => {
+                    if (!s) return false;
+                    const lower = String(s).toLowerCase().trim();
+                    return lower === "sold" || lower === "ขายแล้ว" || lower.includes("sold");
+                  };
+
+                  if (isSoldStatus(property.status)) return null;
+                  if (property.listing_type?.some(t => isSoldStatus(t))) return null;
+                  
+                  const rawDetail = getPrimaryDetail(propertyRow.property_details);
+                  if (isSoldStatus(rawDetail?.status)) return null;
+                  if (isSoldStatus(propertyRow.status)) return null;
+
+                  if ((property as any).isSold || (property as any).is_sold || (property as any).sold) return null;
+
+                  // ------------------------------------------------
+
                   return (
                     <div key={propertyRow.id} className="w-full relative group">
                       <div className="w-full h-auto">
@@ -1847,7 +1914,7 @@ const MyAnnouncements = () => {
                             }
                           }}
                           actionsMenu={
-                            userRole === "agent" ? (
+                            userRole === "agent" && !property.isForSale ? (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <button className="bg-white/90 backdrop-blur-sm p-2 rounded-full hover:bg-white transition-colors shadow-md">
