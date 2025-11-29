@@ -7,18 +7,23 @@ const translations: Record<string, Record<string, string>> = {
     property_not_found: "ไม่พบรายการนี้",
     customer_already_exists: "ลูกค้าคนนี้มีรายการนี้อยู่แล้ว",
     update_failed: "ไม่สามารถอัปเดตข้อมูลได้",
-    customer_notification_title_rented: "เช่าสำเร็จ",
-    customer_notification_title_sold: "ทำสัญญาขายสำเร็จ",
+    customer_notification_title: "เช่าสำเร็จ",
     customer_notification_message: "คุณได้รับการเพิ่มเป็นเจ้าของรายการนี้แล้ว",
+    customer_notification_title_rented: "เช่าสำเร็จ",
+    customer_notification_message_rented: "คุณได้รับการเพิ่มเป็นผู้เช่าของรายการนี้แล้ว",
+    customer_notification_title_sold: "ทำสัญญาขายสำเร็จ",
+    customer_notification_message_sold: "คุณได้รับการเพิ่มเป็นเจ้าของรายการนี้แล้ว",
   },
   en: {
     property_not_found: "Property not found",
     customer_already_exists: "This customer already has this property",
     update_failed: "Failed to update data",
+    customer_notification_title: "Rental Successful",
+    customer_notification_message: "You have been added as the owner of this property",
     customer_notification_title_rented: "Rental Successful",
-    customer_notification_title_sold: "Sale Contract Successful",
-    customer_notification_message:
-      "You have been added as the owner of this property",
+    customer_notification_message_rented: "You have been added as the tenant of this property",
+    customer_notification_title_sold: "Sale Contract Completed",
+    customer_notification_message_sold: "Your sale contract has been completed",
   },
 };
 
@@ -87,21 +92,27 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // สร้างการแจ้งเตือนให้ลูกค้า (เลือกหัวข้อขึ้นอยู่กับสถานะที่อัปเดต)
+    // สร้างการแจ้งเตือนให้ลูกค้า — เลือกข้อความ/หัวเรื่องตามคอลัมน์ status
     try {
-      const updatedStatus = Array.isArray(data) && data.length > 0
-        ? data[0]?.status
-        : (data as any)?.status || "rented";
+      // ตรวจสอบสถานะจากผลลัพธ์การอัปเดต (update with select returns updated rows)
+      const updatedStatus = Array.isArray(data) && data.length > 0 ? data[0]?.status : data?.status;
 
-      const titleKey = updatedStatus === "sold"
-        ? "customer_notification_title_sold"
-        : "customer_notification_title_rented";
+      let titleKey = "customer_notification_title";
+      let messageKey = "customer_notification_message";
+
+      if (updatedStatus === "sold") {
+        titleKey = "customer_notification_title_sold";
+        messageKey = "customer_notification_message_sold";
+      } else if (updatedStatus === "rented") {
+        titleKey = "customer_notification_title_rented";
+        messageKey = "customer_notification_message_rented";
+      }
 
       await supabase.from("notifications").insert([
         {
           sender_id: agentId, // Agent ที่เพิ่มลูกค้า
           receiver_id: customerId,
-          message: t("customer_notification_message", language),
+          message: t(messageKey, language),
           headder: t(titleKey, language),
           read: "false",
           role: "agent",
